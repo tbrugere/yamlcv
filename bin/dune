@@ -1,0 +1,5 @@
+(executable
+ (public_name yamlcv)
+ (name main)
+ (preprocess (pps tyxml-ppx))
+ (libraries yamlcv))
