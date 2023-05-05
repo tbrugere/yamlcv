@@ -1,3 +1,6 @@
+(**
+   Parsing functions for the yaml CV format
+ *)
 
 type single_date = int [@@deriving show]
 type date = Year of single_date | Interval of single_date * single_date option [@@deriving show]
@@ -27,7 +30,8 @@ type cvitem = [item_cvitem | link_cvitem]
 (* type tagged_cvitem = Tags.tagset * cvitem *)
 (* type tagged_value = Tags.tagsset * string *)
 
-(* let is_item_O: *)
+type tag = Tags.tag
+type tags = Tags.tagset
 
 
 type _ state = 
@@ -36,24 +40,35 @@ type _ state =
     | DateState: date state
     | IntState: int state
 
-
-(* let merge_tagged_lists =  *)
-    (* How two tagged lists are merged *)
-
 let fail error_message yaml = 
     failwith (Printf.sprintf "Error: %s while reading: %s" error_message (Yaml.to_string_exn yaml))
 
+(**
+ Reads a list of tags in a yaml list. (from a [tags: [tag1, tag2, ...]] field)
+ *)
 let read_tag_list = function
-    | `A (l) -> List.map ( function |`String s -> s | othervalue -> fail "Tags should be strings" othervalue) l
+    | `A (l) -> l 
+        |> List.map ( function |`String s -> s | othervalue -> fail "Tags should be strings" othervalue)
+        |> Tags.tagset_of_list
     | othervalue -> fail "Tags should be a list" othervalue
 
+(**
+   Reads a yaml object and if it is a dictionary, extracts tags from the eventual [tags: [tag1, tag2, ...]] field.
+*)
 let get_tags : Yaml.value -> tags * Yaml.value = function
     | (`O association_list) as yaml -> begin match List.assoc_opt "tags" association_list with
-        | None -> ([], yaml)
+        | None -> (Tags.empty, yaml)
         | Some tags -> ((read_tag_list tags), `O (List.remove_assoc "tags" association_list) )
         end
-    | yaml -> ([], yaml)
+    | yaml -> (Tags.empty, yaml)
 
+(***************************************)
+(** {0 Identifying functions.} 
+    Check if a yaml object represent a link, an item or a date. 
+    (used by the parser)
+ *) 
+
+(**check if a yaml object is a cvitem *)
 let is_item = function Yaml.(`O association_list) -> 
     association_list 
     |> List.exists (function 
@@ -63,6 +78,8 @@ let is_item = function Yaml.(`O association_list) ->
         | "precision", _ -> true 
         | _ -> false) 
 
+
+(**check if a yaml object is a link*)
 let is_link = function Yaml.(`O association_list) -> 
     association_list 
     |> List.exists (function 
@@ -72,6 +89,7 @@ let is_link = function Yaml.(`O association_list) ->
         | "link", _ -> true 
         | _ -> false)
 
+(**check if a yaml object is a date*)
 let is_date = 
     function 
     |Yaml.(`O association_list) -> association_list 
@@ -82,29 +100,132 @@ let is_date =
     | Yaml.(`Float f) -> Float.is_integer f
     | _ -> false
 
-let rec parse : type a. a state -> tag list -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
+(******************************************************)
+(**{0 handling dictionaries of tags}
+
+in the yamlcv format, we can have a dictionary of tagged values, like this:
+    tag1: value1
+    tag2: value2
+    tag3: value3
+    ...
+where value1, value2, value3 are yaml objects, that evaluate to a list of cv items (either dates / items or links depending on what is allowed in the context)
+
+such a dictionary will be evaluated in the following way
+1. each item under a key is tagged with the key (for example the items that value1 evaluates to will be tagged with tag1)
+2. each item is tagged with all the other keys in the dictionary in negative form (for example the items under value1 will be tagged with no-tag2 and no-tag3)
+3. the resulting list of tagged items is flattened (we could equivalently consider that we use the product scheme, but that would be equivalent )
+*) 
+
+(**
+when reading a dictionary of tagged values, tag1: value1, tag2: value2, ...
+we assume each value is implicitely tagged with all the other tags in negative form.
+(so value1 gets the tags tag1, no-tag2, no-tag3, ...)
+ *)
+let add_implicit_tags: (tag * 'a) list -> (tags * 'a) list = fun tagged_list ->
+    let all_tags_negated = 
+        tagged_list 
+        |> List.map fst 
+        |> Tags.tagset_of_list 
+        |> Tags.TagMap.map Tags.negate 
+    in
+    tagged_list
+    |> List.map 
+        (fun (tag, value) -> 
+        (Tags.tag_merge_trump all_tags_negated (Tags.tagset_of_list [tag]) , 
+        value))
+
+(**
+   when reading an object that represents an item / a date or a link,
+   the individual fields may represent lists of tagged items.
+   If so we merge them using the following scheme:
+       we take the cartesian product of the lists of tagged items
+       we eliminate the "impossible cases" tagged with a tag in both positive and negative form (ie with tag and no-tag)
+
+    in the end from a dictionary of 
+    key1: value1
+    key2: value2
+    key3: value3
+
+    where valuei evaluates to a list of tagges items itemsi^1, itemsi^2, itemsi^3, ...
+    we obtain a list of tagged items
+    where each item is of the form
+    key1: items1^u
+    key2: items2^v
+    key3: items3^w
+    where u, v, w are integers
+
+    for all integers where such a combination of u, v, w makes sense 
+    (ie the tags of items1^u, items2^v, items3^w are compatible)
+*)
+let product_merge  (fields_values:  (string * (tags * 'a) list) list): 
+    (tags * ((string * 'a) list)) list =
+    let fields = List.map fst fields_values in
+    let values = List.map snd fields_values in
+    let product_accum_list_reverse 
+        (l1: (tags * ('a list)) list) 
+        (l2: (tags * 'a) list) : (tags * ('a list)) list = 
+        let seq1 = List.to_seq l1 in
+        let seq2 = List.to_seq l2 in
+        Seq.product seq1 seq2
+        |> Seq.filter_map 
+            begin fun ( (tags1, values1), (tags2, value2) ) -> 
+                match Tags.tag_merge tags1 tags2 with
+                | None -> None
+                | Some tags -> Some (tags, value2::values1)
+            end
+        |> List.of_seq
+    in 
+    match values with
+    | [] -> failwith "product_merge: empty list"
+    | first_value::rest_values -> 
+        let init = 
+            first_value 
+            |> List.map (fun (tags, value) -> (tags, [value]))
+        in
+        rest_values
+        |> List.fold_left product_accum_list_reverse init
+        |> List.map (fun (tags, values) -> (tags, List.rev values))
+        |> List.map (fun (tags, values) -> (tags, List.combine fields values))
+
+
+(***************************************)
+(** Parsing functions *) 
+
+let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
     let open Yaml in 
     let inner_tags, yaml = get_tags yaml in
-    let tags = tags @ inner_tags in
+    (* inner tags trump outer tags *)
+    let tags = Tags.tag_merge_trump tags inner_tags in
     match state, yaml with
-
     (*Parsing items*)
     | NoState, `String s ->  [tags, `Item (make_item ~what:s ()) ]
     | NoState, (`O association_list as item) when is_item item 
         -> (parse_item association_list :> (tags * cvitem) list)
     | _, ((`O _) as item) when is_item item 
-        -> fail "Unexpected item while reading item or date" item
+        -> fail "Unexpected item while reading item content or date" item
 
     (* Parsing dates *)
     | DateState, ((`Float _ | `O _) as date ) when is_date date -> parse_date tags date
+    | _, date when is_date date -> fail "Unexpected date" date
+
     (*parsing links*)
     | NoState, (`O association_list as link) when is_link link 
         -> (parse_link association_list :> (tags * cvitem) list)
 
-    | _, date when is_date date -> fail "Unexpected date" date
-    | _, `A (yaml_list) -> yaml_list |>  List.map (parse state tags) |> List.flatten
+    (* recurse into cases *)
+    | _, `A (yaml_list) -> yaml_list |>  List.map (parse state tags) |> List.flatten (* list of items *)
+    | _, `O (tagged_value_list) -> tagged_value_list 
+        |> add_implicit_tags
+        |> List.map (fun (tags, value) -> parse state (tags) value) 
+        |> List.flatten
+
+    (* parsing content *)
+
+    (* unexpected things *)
     | DateState, yaml -> fail "Invalid date" yaml
     | _, somethingelse -> fail "Not implemented" somethingelse
+
+
     (*     | ContentState  -> [tags, s] *)
     (*     | DateState  -> [tags, s] *)
     (* | _ -> NotSupported *)
@@ -112,8 +233,24 @@ and parse_item (association_list: (string * Yaml.value) list ) : (tags * item_cv
 and parse_link (association_list: (string * Yaml.value) list ) : (tags * link_cvitem) list = failwith "NI"
 and parse_date tags date : (tags * date) list   = match date with 
     |`Float year -> [tags, Year (int_of_float year)]
-    |(`O ["begin", b; "end", e] | `O ["end", e; "begin", b]) 
-        -> [tags, Interval (int_of_float b, Some (int_of_float e))]
-    |(`O ["begin", b]) -> [tags, Interval (int_of_float b, None)]
-    | `O date -> fail "Invalid date" date
+    |(`O fields_values) as date ->
+        fields_values (* fields, yaml *)
+        |> List.map begin function
+            | (("begin" | "end") as field, yaml) -> (field, 
+                parse IntState tags yaml |> List.map (fun (tags, value) -> (tags, `Int value)))
+            | ("text", yaml) -> ("text", 
+                parse IntState tags yaml |> List.map (fun (tags, value) -> (tags, `Text value))) 
+            | _ -> fail "Invalid date" date
+        end
+            (* fields, (tags * value ) list *)
+        |> product_merge 
+        |> List.map (fun (tags, fields_values) -> tags, Date fields_values)
+    (* |(`O ["begin", `Float b; "end", `Float e]  *)
+    (* | `O ["end", `Float e; "begin", `Float b])  *)
+    (*     -> [tags, Interval (int_of_float b, Some (int_of_float e))] *)
+    (* |(`O ["begin", `Float b]) -> [tags, Interval (int_of_float b, None)] *)
+    (* | (`O _) as date -> fail "Invalid date" date *)
 
+
+let parse yaml = 
+    parse NoState Tags.empty yaml
