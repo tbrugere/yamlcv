@@ -17,7 +17,7 @@ type link = {
 } [@@deriving make, show]
 
 type item = {
-    date: date option;
+    date: date_item option;
     what: string option;
     where: string option;
     precision: string option;
@@ -34,11 +34,6 @@ type tag = Tags.tag
 type tags = Tags.tagset
 
 
-type _ state = 
-    | NoState :  cvitem state
-    | ContentState:  string state
-    | DateState: date state
-    | IntState: int state
 
 let fail error_message yaml = 
     failwith (Printf.sprintf "Error: %s while reading: %s" error_message (Yaml.to_string_exn yaml))
@@ -99,6 +94,13 @@ let is_date =
             | _ -> false)
     | Yaml.(`Float f) -> Float.is_integer f
     | _ -> false
+
+let identify_item =
+    function
+    | (`O _ | `Float _) as date when is_date date -> `IsDate
+    | (`O _) as item when is_item item -> `IsItem
+    | (`O _) as link when is_link link -> `IsLink
+    | _ -> `IsUnknown
 
 (******************************************************)
 (**{0 handling dictionaries of tags}
@@ -191,30 +193,38 @@ let product_merge  (fields_values:  (string * (tags * 'a) list) list):
 (***************************************)
 (** Parsing functions *) 
 
+type _ state = 
+    | NoState :  cvitem state
+    | ContentState:  [`Text of string] state
+    | DateState: [`Date of date_item] state
+    | IntState: [`Int of int] state
+
 let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
     let open Yaml in 
     let inner_tags, yaml = get_tags yaml in
     (* inner tags trump outer tags *)
     let tags = Tags.tag_merge_trump tags inner_tags in
-    match state, yaml with
+    let node_type = identify_item yaml in
+    match state, node_type, yaml with
     (*Parsing items*)
-    | NoState, `String s ->  [tags, `Item (make_item ~what:s ()) ]
-    | NoState, (`O association_list as item) when is_item item 
-        -> (parse_item association_list :> (tags * cvitem) list)
-    | _, ((`O _) as item) when is_item item 
+    | NoState, _, `String s ->  [tags, `Item (make_item ~what:s ()) ]
+    | NoState, `IsItem, `O association_list
+        -> (parse_item tags association_list :> (tags * cvitem) list)
+    | _, `IsItem, item
         -> fail "Unexpected item while reading item content or date" item
 
     (* Parsing dates *)
-    | DateState, ((`Float _ | `O _) as date ) when is_date date -> parse_date tags date
-    | _, date when is_date date -> fail "Unexpected date" date
+    | DateState, `IsDate, ((`Float _ | `O _) as date ) -> 
+            (parse_date tags date :> (tags * a) list)
+    | _, `IsDate, date -> fail "Unexpected date" date
 
     (*parsing links*)
-    | NoState, (`O association_list as link) when is_link link 
-        -> (parse_link association_list :> (tags * cvitem) list)
+    | NoState, `IsLink, (`O association_list) 
+        -> (parse_link tags association_list :> (tags * cvitem) list)
 
     (* recurse into cases *)
-    | _, `A (yaml_list) -> yaml_list |>  List.map (parse state tags) |> List.flatten (* list of items *)
-    | _, `O (tagged_value_list) -> tagged_value_list 
+    | _, `IsUnknown, `A (yaml_list) -> yaml_list |>  List.map (parse state tags) |> List.flatten (* list of items *)
+    | _, `IsUnknown, `O (tagged_value_list) -> tagged_value_list 
         |> add_implicit_tags
         |> List.map (fun (tags, value) -> parse state (tags) value) 
         |> List.flatten
@@ -222,29 +232,75 @@ let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun s
     (* parsing content *)
 
     (* unexpected things *)
-    | DateState, yaml -> fail "Invalid date" yaml
-    | _, somethingelse -> fail "Not implemented" somethingelse
+    | DateState, _, yaml -> fail "Invalid date" yaml
+    | _, _,  somethingelse -> fail "Not implemented" somethingelse
 
 
     (*     | ContentState  -> [tags, s] *)
     (*     | DateState  -> [tags, s] *)
     (* | _ -> NotSupported *)
-and parse_item (association_list: (string * Yaml.value) list ) : (tags * item_cvitem) list = failwith "NI"
-and parse_link (association_list: (string * Yaml.value) list ) : (tags * link_cvitem) list = failwith "NI"
-and parse_date tags date : (tags * date) list   = match date with 
-    |`Float year -> [tags, Year (int_of_float year)]
+and parse_item (tags: tags) (association_list: (string * Yaml.value) list ) : (tags * item_cvitem) list = 
+    association_list
+    |> List.map (function 
+        |( ("what"|"where"|"precision") as field, yaml) 
+        -> ((field, (parse ContentState tags yaml)) 
+            :> string * (tags * [`Text of string | `Date of date_item]) list)
+        | ("date", yaml) 
+        -> (("date", (parse DateState tags yaml)
+            :> string * (tags * [`Text of string | `Date of date_item]) list)
+        )
+        | (field, _) -> failwith [%string "Unexpected field in item %{field}"] )
+    |> product_merge
+    |> List.map (fun (tags, fields_values)->
+        let detext = function (`Text s) -> s | (`Date _) -> failwith "impossible" 
+        and dedate = function (`Text _) -> failwith "impossible" | (`Date d) -> d 
+        in
+        let what = List.assoc_opt "what" fields_values |> Option.map detext
+        and where = List.assoc_opt "where" fields_values |> Option.map detext
+        and precision = List.assoc_opt "precision" fields_values |> Option.map detext
+        and date = List.assoc_opt "date" fields_values |> Option.map dedate
+        in
+        tags, `Item (make_item ?what ?where ?precision ?date ())
+    ) 
+and parse_link (tags: tags) (association_list: (string * Yaml.value) list ) : (tags * link_cvitem) list =  
+    association_list
+    |> List.map (fun (field, yaml) -> (field, (parse ContentState tags yaml)))
+    |> product_merge
+    |> List.map (fun (tags, fields_values)->
+        let detext = fun (`Text s) -> s in
+        let icon = List.assoc_opt "icon" fields_values |> Option.map detext
+        and text = List.assoc_opt "text" fields_values |> Option.map detext
+        and alttext = List.assoc_opt "alttext" fields_values |> Option.map detext
+        and link = List.assoc_opt "link" fields_values |> Option.map detext
+        in
+        tags, `Link (make_link ?icon ?text ?alttext ?link ())
+    ) 
+and parse_date tags date : (tags * [`Date of date_item]) list = match date with 
+    |`Float year -> [tags, `Date (make_date_item ~date:(Year (int_of_float year)) ())]
     |(`O fields_values) as date ->
         fields_values (* fields, yaml *)
         |> List.map begin function
-            | (("begin" | "end") as field, yaml) -> (field, 
-                parse IntState tags yaml |> List.map (fun (tags, value) -> (tags, `Int value)))
-            | ("text", yaml) -> ("text", 
-                parse IntState tags yaml |> List.map (fun (tags, value) -> (tags, `Text value))) 
+            | (("begin" | "end") as field, yaml) -> ((field, parse IntState tags yaml) 
+                :> (string * (tags * [`Int of int | `Text of string]) list)  
+            )
+            | ("text", yaml) -> (("text", parse ContentState tags yaml) 
+                :> (string * (tags * [`Int of int | `Text of string]) list)  
+            )
             | _ -> fail "Invalid date" date
-        end
-            (* fields, (tags * value ) list *)
+        end 
         |> product_merge 
-        |> List.map (fun (tags, fields_values) -> tags, Date fields_values)
+        |> List.map (fun (tags, fields_values) -> 
+            let text = List.assoc_opt "text" fields_values in
+            let text = Option.map (function `Text t->t| _ -> fail "invalid date" date) text in
+            let fields_values = List.remove_assoc "text" fields_values in
+            let fields_values = 
+                List.sort (fun (field1, _) (field2, _) -> compare field1 field2) fields_values in
+            let date =  match fields_values with
+            | ["begin", `Int b; "end", `Int e; ] -> Interval (b, Some e)
+            | ["begin", `Int b] -> Interval (b, None)
+            | _ -> fail "Invalid date" date
+            in tags, `Date (make_date_item ~date:date ?text:text ())
+            )
     (* |(`O ["begin", `Float b; "end", `Float e]  *)
     (* | `O ["end", `Float e; "begin", `Float b])  *)
     (*     -> [tags, Interval (int_of_float b, Some (int_of_float e))] *)

@@ -1,5 +1,5 @@
 (library
  (name yamlcv)
  (libraries yaml)
- (preprocess (pps ppx_deriving.make ppx_deriving.show))
+ (preprocess (pps ppx_deriving.make ppx_deriving.show ppx_string))
  )
