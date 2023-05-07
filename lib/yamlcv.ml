@@ -64,7 +64,7 @@ let get_tags : Yaml.value -> tags * Yaml.value = function
  *) 
 
 (**check if a yaml object is a cvitem *)
-let is_item = function Yaml.(`O association_list) -> 
+let is_item = function `O association_list -> 
     association_list 
     |> List.exists (function 
         | "what", _ 
@@ -75,7 +75,7 @@ let is_item = function Yaml.(`O association_list) ->
 
 
 (**check if a yaml object is a link*)
-let is_link = function Yaml.(`O association_list) -> 
+let is_link = function `O association_list -> 
     association_list 
     |> List.exists (function 
         | "icon", _ 
@@ -87,12 +87,12 @@ let is_link = function Yaml.(`O association_list) ->
 (**check if a yaml object is a date*)
 let is_date = 
     function 
-    |Yaml.(`O association_list) -> association_list 
+    |`O association_list -> association_list 
         |> List.exists (function 
             | "begin", _ 
             | "end", _ -> true 
             | _ -> false)
-    | Yaml.(`Float f) -> Float.is_integer f
+    | `Float f -> Float.is_integer f
     | _ -> false
 
 let identify_item =
@@ -200,7 +200,6 @@ type _ state =
     | IntState: [`Int of int] state
 
 let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
-    let open Yaml in 
     let inner_tags, yaml = get_tags yaml in
     (* inner tags trump outer tags *)
     let tags = Tags.tag_merge_trump tags inner_tags in
