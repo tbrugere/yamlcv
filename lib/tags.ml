@@ -9,6 +9,17 @@ module TagMap = Map.Make(String)
 type tagset = tag_type TagMap.t
 let empty = TagMap.empty
 
+let tagset_to_stringlist tagset = 
+    let tagset = TagMap.bindings tagset in
+    let tagset = List.map (fun (tag, value) -> 
+        match value with
+        | `Positive -> tag
+        | `Negative -> "no-" ^ tag
+    ) tagset in
+    tagset
+let tagset_to_string tagset = 
+    String.concat "," (tagset_to_stringlist tagset)
+
 (** 
 Merge two tagsets, where the second tagset takes precedence over the first
 [tagm_merge_trump a b] merges a and b, 

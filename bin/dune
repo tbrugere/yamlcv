@@ -1,5 +1,5 @@
 (executable
  (public_name yamlcv)
  (name main)
- (preprocess (pps tyxml-ppx))
- (libraries yamlcv))
+ (preprocess (pps tyxml-ppx ppx_string))
+ (libraries yamlcv containers yaml cmdliner tyxml))

@@ -1,10 +1,9 @@
-(**
-   Parsing functions for the yaml CV format
- *)
-
 module Tags = Tags
 module Html = Html
 module Base_types = Base_types
 module Serialize = Serialize
 
-let serialize = Serialize.parse;;
+
+val serialize: Yaml.value -> (Tags.tagset * Base_types.cvitem) list
+
+
