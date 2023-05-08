@@ -1,7 +1,6 @@
 (**{0 HTML serialization}*)
 
 open Base_types
-open Tyxml
 
 let year_to_html ?(present_string="Present") (year: int option) = 
     let open Tyxml.Html in
@@ -48,7 +47,7 @@ let icon_to_html icon alttext =
     let open Tyxml.Html in
     img ~src:icon ~a:[a_class ["yamlcv-icon"]] ~alt:alttext ()
 
-let link_to_html ?(tags=[]) link_ = 
+let link_to_html ?(tags=[]) (link_: link) = 
     let open Tyxml.Html in
     let alttext = Option.value link_.alttext ~default:"" in
     let icon_html = match link_.icon with
@@ -70,7 +69,6 @@ let tagged_item_to_html (tags, cvitem) =
         |> List.map (String.cat "yamlcv-tag-")
         |> List.cons "yamlcv" (*add the yamlcv tag*)
     in
-    let open Html in
     match cvitem with
     | `Item item -> item_to_html ~tags:tags_style item
     | `Link link -> link_to_html ~tags:tags_style link
