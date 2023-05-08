@@ -19,7 +19,8 @@
  (name yamlcv)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune yaml containers tyxml tyxml-ppx ppx_deriving ppx_string cmdliner)
+ (depends ocaml dune yaml containers tyxml tyxml-ppx 
+          ppx_deriving ppx_string cmdliner pandoc)
  (tags
   (topics "to describe" your project)))
 

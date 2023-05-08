@@ -33,6 +33,11 @@ let apply_filters filters tags = List.for_all (fun filter -> apply_filter filter
 
 let filter_items filters = List.filter (fun (tags, _) -> apply_filters filters tags)
 
+let wrap_elements_in_ul elt_list = 
+    let open Tyxml.Html in
+    elt_list
+    |> List.map (fun item -> li ~a:[a_class ["yamlcv"]] [item])
+    |> ul ~a:[a_class ["yamlcv"]]
 
 (***************************************************)
 (**{1 Main code}*)
@@ -61,9 +66,8 @@ let main (wrap_in_ul:bool) (input_file:string) (output_file:string) (filters:fil
             end
     | true -> 
             let open Tyxml.Html in
-            items 
-            |> List.map (fun item -> li ~a:[a_class ["yamlcv"]] [item])
-            |> ul ~a:[a_class ["yamlcv"]]
+            items
+            |> wrap_elements_in_ul
             |> Format.asprintf "%a" (Tyxml.Html.pp_elt ())
             |> match output_file with 
                 | "-" -> CCIO.write_line stdout
@@ -72,32 +76,49 @@ let main (wrap_in_ul:bool) (input_file:string) (output_file:string) (filters:fil
 let pandoc_filter () =
     let ast_json = Yojson.Basic.from_channel stdin in
     let p = Pandoc.of_json ast_json in
-    let filters =
-        let get_assoc_list ?(error_message="should be an object") = function
-            | `Assoc assoc_list -> assoc_list
-            | _ -> failwith error_message
-        in
-        let ast_json_assoc = get_assoc_list ast_json in
-        let meta = List.assoc "meta" ast_json_assoc in
-        let meta = get_assoc_list ~error_message:"meta should be an object" meta in
-        let filters = List.assoc "filters" meta in
-        let filters = get_assoc_list 
-            ~error_message:"filters should be an object" filters in
-        filters
-        |> List.map (function 
-            | (filter_type, `String tag) -> 
-                    [filter_type_of_string filter_type, tag]
-            | (filter_type, `List tags) -> 
-                    let filter_type = filter_type_of_string filter_type in
-                    tags
-                    |>List.map (function 
-                        |`String tag -> filter_type, tag
-                        | _ -> failwith "filter tags should be a string or a list of strings"
-                    ) 
-            | _ -> failwith "filter tags should be a string or a list of strings"
-        )
-        |> List.flatten
+    let meta_assoc = match p.meta with
+    | `Assoc association -> association
+    | _ -> failwith "metadata should be an association list"
     in
+    let input_file = match List.assoc_opt "yamlcv_file" meta_assoc with
+        | Some (`String s) -> s
+        | Some _ -> failwith "yamlcv_file should be a string"
+        | None -> failwith "missing yamlcv_file parameter in metadata"
+    in 
+    let file_content =  CCIO.(with_in input_file read_all) in
+    let yaml = Yaml.of_string_exn file_content in
+    let all_items = try serialize yaml 
+        with Failure s -> CCIO.write_line stderr s; raise SerializeError
+    in 
+    let block_map = function 
+        | Pandoc.CodeBlock ((_, classes, _) as attr, code) 
+            when List.mem "yamlcv" classes -> 
+                let filters = 
+                    code 
+                    |> Yaml.of_string_exn 
+                    |> (function | `O filters -> filters
+                        | _ -> failwith "filters should be an object")
+                    |> List.map (function 
+                        |(tag, `String filter) -> 
+                        (filter_type_of_string filter, tag)
+                        | _ -> failwith "filter should be a string"
+                    )
+                in 
+                let items = 
+                    all_items 
+                    |> filter_items filters
+                    |> List.map Html.tagged_item_to_html
+                    |> wrap_elements_in_ul
+                in
+                Some [Pandoc.RawBlock 
+                ("html", Format.asprintf "%a" (Tyxml.Html.pp_elt ()) items)
+                ]   
+        | _ -> None
+    in 
+    p 
+    |> Pandoc.map_blocks block_map (*TODO add inline mapping, for single elem*)
+
+
 
 
 (******************************
