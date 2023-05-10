@@ -1,5 +1,4 @@
 exception SerializeError
-exception Not_implemented
 
 open Yamlcv
 (* open Yamlcv.Base_types *)
@@ -65,7 +64,6 @@ let main (wrap_in_ul:bool) (input_file:string) (output_file:string) (filters:fil
             | _ -> CCIO.(with_out output_file CCIO.write_lines_l lines)
             end
     | true -> 
-            let open Tyxml.Html in
             items
             |> wrap_elements_in_ul
             |> Format.asprintf "%a" (Tyxml.Html.pp_elt ())
@@ -91,7 +89,7 @@ let pandoc_filter () =
         with Failure s -> CCIO.write_line stderr s; raise SerializeError
     in 
     let block_map = function 
-        | Pandoc.CodeBlock ((_, classes, _) as attr, code) 
+        | Pandoc.CodeBlock ((_, classes, _), code) 
             when List.mem "yamlcv" classes -> 
                 let filters = 
                     code 
@@ -117,8 +115,8 @@ let pandoc_filter () =
     in 
     p 
     |> Pandoc.map_blocks block_map (*TODO add inline mapping, for single elem*)
-
-
+    |> Pandoc.to_json
+    |> Yojson.Basic.to_channel stdout
 
 
 (******************************
@@ -157,9 +155,9 @@ let cmd =
         Cmd.v info main_term
     in
     let pandoc_command =
-        let doc = "Run as a pandoc filter" in
+        let doc = "Run as a pandoc filter to html" in
         let term = Term.(const pandoc_filter $ const ()) in
-        let info = Cmd.info "pandoc" ~doc in
+        let info = Cmd.info "html" ~doc in
         Cmd.v info term
     in
     let info = Cmd.info "yamlcv" ~doc:"CV serialization from yaml files" in

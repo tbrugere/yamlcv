@@ -17,6 +17,8 @@ depends: [
   "tyxml-ppx"
   "ppx_deriving"
   "ppx_string"
+  "cmdliner"
+  "pandoc"
   "odoc" {with-doc}
 ]
 build: [
