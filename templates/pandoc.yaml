@@ -1,4 +1,9 @@
 to: html
 shift-heading-level-by: -1
 filters:
-  - yamlcv
+  - _build/install/default/bin/yamlcv
+  # - yamlcv
+standalone: true
+
+css:
+  - templates/template.css

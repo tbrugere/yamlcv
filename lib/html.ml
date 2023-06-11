@@ -40,7 +40,8 @@ let item_to_html ?(present_string="Present") ?(tags=[]) item =
         | Some precision -> span ~a:[a_class ["yamlcv-precision"]] [txt precision]
         | None -> txt ""
     in
-    div ~a:[a_class ("yamlcv-item"::tags)] [date_html; what_html; where_html; precision_html]
+    let content_html = div~a:[a_class ["yamlcv-content"]] [what_html; where_html; precision_html] in
+    div ~a:[a_class ("yamlcv-item"::tags)] [date_html; content_html]
 
 (*maybe later add support for inlining svg icons*)
 let icon_to_html icon alttext = 

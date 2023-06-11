@@ -18,7 +18,7 @@ depends: [
   "ppx_deriving"
   "ppx_string"
   "cmdliner"
-  "pandoc"
+  "pandoc" {= "git+https://github.com/smimram/ocaml-pandoc"}
   "odoc" {with-doc}
 ]
 build: [
