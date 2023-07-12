@@ -1,0 +1,3 @@
+pin-depends: [
+  [ "cohttp-lwt-jsoo.4.0.0" "git+https://github.com/routineco/ocaml-cohttp#b0ea1468f55dc6fe1b59929ee4545b580f63af0c" ]
+]

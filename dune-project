@@ -20,8 +20,13 @@
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml dune yaml containers tyxml tyxml-ppx 
-          ppx_deriving ppx_string cmdliner (pandoc (= git+https://github.com/smimram/ocaml-pandoc)))
+          ppx_deriving ppx_string cmdliner fmt
+          pandoc 
+          (alcotest :with-test)
+          logs
+          )
  (tags
   (topics "to describe" your project)))
+
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
