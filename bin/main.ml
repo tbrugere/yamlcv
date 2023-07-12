@@ -166,8 +166,17 @@ let pandoc_filter () =
    {1 Cmdliner stuff}
 *)
 
+let setup_log style_renderer level =
+  Fmt_tty.setup_std_outputs ?style_renderer ();
+  Logs.set_level level;
+  Logs.set_reporter (Logs_fmt.reporter ());
+  ()
+
 let cmd = 
     let open Cmdliner in
+    let setup_log =
+        Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ())
+    in
     let main_term = 
         let input_arg = Arg.(value & opt string "-" & 
         info ["i"; "input"] ~docv:"FILENAME" ~doc:"the yaml input file") in 
@@ -190,7 +199,7 @@ let cmd =
             let merge_3 = fun a b c -> a @ b @ c in
             Term.(const merge_3 $ only_arg $ include_arg $ exclude_arg)
         in
-        Term.(const catch_failure $ (const main $ wrap_in_ul $ input_arg $ output_arg $ filters) $ const ())
+        Term.(const catch_failure $ (const main $ wrap_in_ul $ input_arg $ output_arg $ filters) $ setup_log)
     in 
     let main_command = 
         let doc = "serialize a yaml file" in

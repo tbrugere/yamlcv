@@ -7,4 +7,4 @@ module Html = Html
 module Base_types = Base_types
 module Serialize = Serialize
 
-let serialize = Serialize.parse;;
+let serialize = Serialize.serialize;;

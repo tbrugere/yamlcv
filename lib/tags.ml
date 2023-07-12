@@ -20,6 +20,8 @@ let tagset_to_stringlist tagset =
 let tagset_to_string tagset = 
     String.concat "," (tagset_to_stringlist tagset)
 
+let pp_tagset : tagset Fmt.t = Fmt.of_to_string tagset_to_string
+
 (** 
 Merge two tagsets, where the second tagset takes precedence over the first
 [tagm_merge_trump a b] merges a and b, 

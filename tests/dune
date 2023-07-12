@@ -1,0 +1,4 @@
+(tests 
+  (names test_yamlcv)
+  (libraries yamlcv alcotest containers)
+  )

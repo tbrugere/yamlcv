@@ -1,5 +1,15 @@
 open Base_types
 
+(**********Logging**)
+let logging_src = Logs.Src.create "yamlcv.serialize" ~doc:"yamlcv serialization"
+module Log = (val Logs.src_log logging_src : Logs.LOG)
+
+
+(***************************************)
+(** {0 Base types.} 
+    datatypes used for serialization
+ *) 
+
 type context_item = [`Tag of string | `List of int | `Field of string]
 type context = context_item list
 let add_to_context ?(field:string option) ?(item_num:int option) ?(tag: string option) (context:context) = 
@@ -223,6 +233,8 @@ let product_merge  (fields_values:  (string * (tags * 'a) list) list):
 
 
 let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
+    Log.debug (fun m -> m "parse: state %s tags %a" (string_of_state state) 
+                    Tags.pp_tagset tags);
     let inner_tags, yaml = get_tags yaml in
     (* inner tags trump outer tags *)
     let tags = Tags.tag_merge_trump tags inner_tags in
@@ -336,5 +348,5 @@ and parse_date (context:context) (tags:tags) date : (tags * [`Date of date_item]
             in tags, `Date (make_date_item ~date:date ?text:text ())
             )
 
-let parse yaml = 
+let serialize yaml = 
     parse (NoState []) Tags.empty yaml

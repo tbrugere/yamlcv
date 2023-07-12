@@ -1,5 +1,5 @@
 (library
  (name yamlcv)
- (libraries yaml tyxml pandoc yojson)
+ (libraries yaml tyxml pandoc yojson fmt logs)
  (preprocess (pps ppx_deriving.make ppx_deriving.show ppx_string tyxml-ppx))
  )

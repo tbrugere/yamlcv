@@ -1,0 +1,4 @@
+competence:
+  langage:
+    - what: {en: French, fr: Français}
+      precision: {en: mothertongue, fr: langue maternelle}
