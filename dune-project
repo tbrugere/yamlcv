@@ -21,7 +21,8 @@
  (description "A longer description")
  (depends ocaml dune yaml containers tyxml tyxml-ppx 
           ppx_deriving ppx_string cmdliner fmt
-          pandoc 
+          yojson
+          (pandoc (= 0.2.0)) 
           (alcotest :with-test)
           logs
           )
