@@ -1,32 +1,10 @@
-/* ul.yamlcv { */
-/*     list-style-type: none; */
-/*     margin: 0; */
-/*     padding: 0; */
-/*     display: flex; */
-/*     flex-direction: column; */
-/* } */
-/*  */
-/* .yamlcv-item { */
-/*     display: flex; */
-/*     flex-direction: row; */
-/*     gap: 10px; */
-/*     flex-wrap: wrap; */
-/* } */
-/*  */
-/* .yamlcv-date { */
-/*     width: 10em; */
-/*     flex-basis: 10em; */
-/*     flex-grow: 0; */
-/*     flex-shrink: 0; */
-/*     text-align: right; */
-/* } */
 
 ul.yamlcv {
     list-style-type: none;
     margin: 0;
     padding: 0;
     display:grid;
-    grid-template-columns: repeat(4, auto);
+    grid-template-columns: minmax(min-content, max-content) repeat(4, auto);
     column-gap: 10px;
 }
 li.yamlcv {
@@ -57,9 +35,16 @@ li.yamlcv div .yamlcv-content {
 /*     margin-right: 1em; */
 /* } */
 /*  */
-li.yamlcv div .yamlcv-content :not(:last-child)::after {
+li.yamlcv > .yamlcv-item > .yamlcv-content :not(:first-child)::before {
     content: " — ";
     color: lightgrey;
+}
+
+li.yamlcv > div.yamlcv-item.yamlcv-tag-competence::before {
+    content: "•";
+    color: black;
+    grid-column: 1;
+    width: content-fit;
 }
 
 

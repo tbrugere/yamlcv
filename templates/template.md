@@ -23,10 +23,9 @@ obsolete: exclude
 
 ```{.yaml .yamlcv}
 langage: only
-```
-langage: only
 en: include
 obsolete: exclude
+```
 
 ## Computer skills
 ### Languages
@@ -34,12 +33,6 @@ obsolete: exclude
 ```{.yaml .yamlcv}
 en: include
 langage_informatique: only
-obsolete: exclude
-```
-
-```{.yaml .yamlcv}
-en: include
-langage: only
 obsolete: exclude
 ```
 
