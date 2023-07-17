@@ -233,7 +233,7 @@ let product_merge  (fields_values:  (string * (tags * 'a) list) list):
 
 
 let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun state tags yaml -> 
-    Log.debug (fun m -> m "parse: state %s tags %a" (string_of_state state) 
+    Log.debug (fun m -> m "parse: state %s tags: %a \n" (string_of_state state) 
                     Tags.pp_tagset tags);
     let inner_tags, yaml = get_tags yaml in
     (* inner tags trump outer tags *)
@@ -269,7 +269,10 @@ let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun s
     | state, `IsUnknown, `O (tagged_value_list) -> tagged_value_list 
         |> add_implicit_tags
         |> List.map 
-            (fun (tag, tags, value) -> parse (add_to_state ~tag state) tags value) 
+            (fun (tag, new_tags, value) -> 
+                parse (add_to_state ~tag state) 
+                    (Tags.tag_merge_trump tags new_tags)
+                    value) 
         |> List.flatten
 
     (* unexpected things *)

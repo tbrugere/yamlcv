@@ -4,6 +4,7 @@ open Base_types
 let tagset_0 = Tags.tagset_of_list []
 let tagset_1 = Tags.tagset_of_list ["tag1"]
 let tagset_2 = Tags.tagset_of_list ["tag2"]
+let tagset_12 = Tags.tagset_of_list ["tag1"; "tag2"]
 let tagset_1no2 = Tags.tagset_of_list ["tag1"; "no-tag2"]
 let tagset_2no1 = Tags.tagset_of_list ["tag2"; "no-tag1"]
 
@@ -47,10 +48,48 @@ let product_merge_test_cases:
             ]
         ]
 
+let trump_merge_test_cases = [
+            "01", 
+            (tagset_0, tagset_1)
+            , 
+            tagset_1
+        ;
+            "10",
+            (tagset_1,  tagset_0)
+            ,
+            tagset_1
+        ;
+            "11",
+            (tagset_1,  tagset_1)
+            ,
+            tagset_1
+        ;
+            "12",
+            (tagset_1,  tagset_2)
+            ,
+            tagset_12
+        ;
+            "21",
+            (tagset_2,  tagset_1)
+            ,
+            tagset_12
+        ;
+            "2no1_trump", 
+            (tagset_12,  tagset_2no1)
+            ,
+            tagset_2no1
+        ]
+
 let test_product_merge input expected () = 
     let actual = Yamlcv.Serialize.product_merge input in
     Alcotest.(check' (list (pair tags_testable (list (pair string string))))) 
         ~msg:"product_merge"
+        ~expected ~actual
+
+let test_merge_trump (input1, input2) expected ()=
+    let actual = Yamlcv.Tags.tag_merge_trump input1 input2 in
+    Alcotest.(check' tags_testable) 
+        ~msg:"merge_trump"
         ~expected ~actual
 
 let test_file input_file () = 
@@ -71,4 +110,8 @@ let () =
          (fun (name, input, expected) -> 
              test_case name `Quick (test_product_merge input expected)) 
          product_merge_test_cases;
+        "merge_trump", List.map
+        (fun (name, input, expected) ->
+            test_case name `Quick (test_merge_trump input expected))
+        trump_merge_test_cases
     ] |> ignore;
