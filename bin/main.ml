@@ -137,6 +137,14 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
     let block_map = function 
         | Pandoc.CodeBlock ((_, classes, keyvals), code) 
             when List.mem "yamlcv" classes -> 
+                let latex_style_local = match () with
+                    | _ when List.mem "normal" classes -> `Normal
+                    | _ when List.mem "language" classes -> `Language
+                    | _ when List.mem "computer" classes -> `Computer
+                    | _ when List.mem "nocommand" classes -> `NoCommand
+                    | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc "title" keyvals)
+                    | _ -> latex_style
+                in
                 let filters = 
                     code 
                     |> Yaml.of_string_exn 
@@ -148,15 +156,6 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
                         | (_, yaml_value) -> failwith [%string "filter should be a string, got %{Yaml.to_string_exn yaml_value}"]
                     )
                 in 
-                (* let classes_concat = String.concat " ," classes in CCIO.write_line stderr [%string "filters: %{classes_concat}"]; *)
-                let latex_style_local = match () with
-                    | _ when List.mem "normal" classes -> `Normal
-                    | _ when List.mem "language" classes -> `Language
-                    | _ when List.mem "computer" classes -> `Computer
-                    | _ when List.mem "nocommand" classes -> `NoCommand
-                    | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc "title" keyvals)
-                    | _ -> latex_style
-                in
                 let items = 
                     all_items 
                     |> filter_items filters

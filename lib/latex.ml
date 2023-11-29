@@ -173,7 +173,7 @@ let cvitem_to_latex  cvitem =
             let arguments = [entry.date; entry.what; entry.where; entry.localization; entry.grade; entry.comment] in
             `Command ("cventry", arguments)
     | `CVlanguage language -> `Command ("cvlanguage", [language.language; language.level; language.comment])
-    | `CVcomputer computer -> `Command ("cvcomputer", [computer.category; computer.programs])
+    | `CVcomputer computer -> `Command ("cvcomputer", [computer.category; computer.programs;`String ""; `String ""])
     | `WebLink (text, link) -> `CommandOptional ("weblink", [text], [`String link])
     | `HttpLink (text, link) -> `CommandOptional ("httplink", [text], [`String link])
     | `EmailLink (text, link) -> `CommandOptional ("emaillink", [text], [`String link])
