@@ -279,7 +279,7 @@ let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.
     in
     let latex_list = info.social
         |> List.map (
-            fun (_, text, alt) -> `CommandOptional ("social", [`String alt], [`String text]))
+            fun (_, text, alt) -> `CommandOptional ("social", [`String text], [`String alt]))
         |> List.rev_append latex_list
     in 
     let latex_list = match info.website with None -> latex_list
