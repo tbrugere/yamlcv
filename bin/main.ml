@@ -111,7 +111,7 @@ let main (wrap_in_ul:bool) (style:Latex.style) (input_file:string) (output_file:
     let output = 
         match file_type with
         | `Html -> Html.tagged_item_list_to_string ~wrap_in_ul items
-        | `Latex -> Latex.tagged_item_list_to_string ~style:(style :> [Latex.style | `ComputerWrapped of string]) items
+        | `Latex -> Latex.tagged_item_list_to_string ~style:(style :> [Latex.style | `ComputerWrapped of string | `LanguageWrapped of string]) items
     in 
     match output_file with
         | "-" -> CCIO.write_line stdout output
@@ -143,6 +143,7 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
                     | _ when List.mem "computer" classes -> `Computer
                     | _ when List.mem "nocommand" classes -> `NoCommand
                     | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc "title" keyvals)
+                    | _ when List.mem "languagewrap" classes -> `LanguageWrapped (List.assoc "title" keyvals)
                     | _ -> latex_style
                 in
                 let filters = 

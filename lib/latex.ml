@@ -107,7 +107,7 @@ let item_to_latex ?(style=`Normal) ?(present_string="Present") (item: Base_types
         | None -> `String ""
     in match style with
     | `Normal -> `CVentry {date=date_latex; what=what_latex; where=where_latex; localization=empty_latex; grade=empty_latex; comment=precision_latex}
-    | `Language -> `CVlanguage {language=what_latex; level=where_latex; comment=precision_latex}
+    | `Language -> `CVlanguage {language=what_latex; level=precision_latex; comment=where_latex}
     | `Computer -> `CVcomputer {category=what_latex; programs=precision_latex}
     | `NoCommand -> `NoCommand (`Concat [date_latex; `String " "; what_latex; `String " "; where_latex; `String " "; precision_latex])
 
@@ -179,12 +179,16 @@ let cvitem_to_latex  cvitem =
     | `EmailLink (text, link) -> `CommandOptional ("emaillink", [text], [`String link])
     | `NoCommand latex -> latex
 
-let tagged_item_list_to_string ?(style:[style|`ComputerWrapped of string]=`Normal)  items =
+let tagged_item_list_to_string ?(style:[style|`ComputerWrapped of string|`LanguageWrapped of string]=`Normal)  items =
     let ti_to_cvitem, (eventually_wrap_in_computer: moderncv list-> moderncv list)= match style with
     | #style as style -> (tagged_item_to_cvitem ~style, (fun x -> x))
     | `ComputerWrapped title -> 
             (tagged_item_to_cvitem ~style:`NoCommand, 
             (fun x -> [`CVcomputer {category=(`String title); programs=(`String (x |> List.map cvitem_to_latex |> List.map latex_to_string |> String.concat ", "))}]))
+    | `LanguageWrapped title ->
+            (tagged_item_to_cvitem ~style:`NoCommand, 
+            (fun x -> [`CVlanguage {language=(`String title); level=(`String (x |> List.map cvitem_to_latex |> List.map latex_to_string |> String.concat ", ")); comment=(`String "")}]))
+
     in
     items
     |> List.map ti_to_cvitem
