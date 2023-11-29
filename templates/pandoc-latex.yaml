@@ -1,0 +1,10 @@
+
+to: latex
+shift-heading-level-by: -1
+filters:
+  - _build/install/default/bin/yamlcv
+  # - yamlcv
+standalone: true
+
+# css:
+#   - templates/template.css

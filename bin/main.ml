@@ -38,11 +38,6 @@ let apply_filters filters tags = List.for_all (fun filter -> apply_filter filter
 
 let filter_items filters = List.filter (fun (tags, _) -> apply_filters filters tags)
 
-let wrap_elements_in_ul elt_list = 
-    let open Tyxml.Html in
-    elt_list
-    |> List.map (fun item -> li ~a:[a_class ["yamlcv"]] [item])
-    |> ul ~a:[a_class ["yamlcv"]]
 
 (***************************************************)
 (**{1 sorting logic}*)
@@ -90,7 +85,17 @@ let sort_elements elements=
 
 (***************************************************)
 (**{1 Main code}*)
-let main (wrap_in_ul:bool) (input_file:string) (output_file:string) (filters:filter list) () = 
+let main (wrap_in_ul:bool) (style:Latex.style) (input_file:string) (output_file:string) 
+    (filters:filter list) (filetype:[`Html|`Latex|`Unspecified]) () : unit= 
+    let file_type: [`Html|`Latex] = match filetype with
+        | `Unspecified -> begin match output_file with
+            | _  when (String.ends_with ~suffix:"html" output_file)-> `Html
+            | _  when (String.ends_with ~suffix:"tex" output_file)-> `Latex
+            | "-"| _ -> `Html
+        end
+        | `Html -> `Html
+        | `Latex -> `Latex
+    in 
     let file_content = 
         match input_file with
         | "-" -> CCIO.read_all stdin
@@ -102,37 +107,35 @@ let main (wrap_in_ul:bool) (input_file:string) (output_file:string) (filters:fil
         items 
         |> filter_items filters
         |> sort_elements
-        |> List.map Html.tagged_item_to_html
     in 
-    match wrap_in_ul with
-    | false -> 
-            let lines = 
-            items 
-            |> List.map (Format.asprintf "%a" (Tyxml.Html.pp_elt ())) 
-            in
-            begin match output_file with
-            | "-" -> CCIO.write_lines_l stdout lines
-            | _ -> CCIO.(with_out output_file CCIO.write_lines_l lines)
-            end
-    | true -> 
-            items
-            |> wrap_elements_in_ul
-            |> Format.asprintf "%a" (Tyxml.Html.pp_elt ())
-            |> match output_file with 
-                | "-" -> CCIO.write_line stdout
-                | output_file -> CCIO.(with_out output_file write_line)
+    let output = 
+        match file_type with
+        | `Html -> Html.tagged_item_list_to_string ~wrap_in_ul items
+        | `Latex -> Latex.tagged_item_list_to_string ~style:(style :> [Latex.style | `ComputerWrapped of string]) items
+    in 
+    match output_file with
+        | "-" -> CCIO.write_line stdout output
+        | output_file -> CCIO.(with_out output_file write_line output)
 
-let pandoc_filter () =
+let pandoc_filter ~(output_format:[`Html|`Latex]) () =
+    let output_format_string = match output_format with
+        | `Html -> "html"
+        | `Latex -> "latex"
+    in
     let ast_json = Yojson.Basic.from_channel stdin in
     let p = Pandoc.of_json ast_json in
     let input_file = Pandoc.meta_string p "yamlcv_file"    in 
+    let latex_style =
+        try Pandoc.meta_string p "yamlcv_latex_style" |> Latex.style_of_string
+        with _ -> `Normal
+    in
     let file_content =  CCIO.(with_in input_file read_all) in
     let yaml = Yaml.of_string_exn file_content in
     let all_items = try serialize yaml 
         with Failure s -> CCIO.write_line stderr s; raise SerializeError
     in 
     let block_map = function 
-        | Pandoc.CodeBlock ((_, classes, _), code) 
+        | Pandoc.CodeBlock ((_, classes, keyvals), code) 
             when List.mem "yamlcv" classes -> 
                 let filters = 
                     code 
@@ -145,15 +148,27 @@ let pandoc_filter () =
                         | (_, yaml_value) -> failwith [%string "filter should be a string, got %{Yaml.to_string_exn yaml_value}"]
                     )
                 in 
+                (* let classes_concat = String.concat " ," classes in CCIO.write_line stderr [%string "filters: %{classes_concat}"]; *)
+                let latex_style_local = match () with
+                    | _ when List.mem "normal" classes -> `Normal
+                    | _ when List.mem "language" classes -> `Language
+                    | _ when List.mem "computer" classes -> `Computer
+                    | _ when List.mem "nocommand" classes -> `NoCommand
+                    | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc "title" keyvals)
+                    | _ -> latex_style
+                in
                 let items = 
                     all_items 
                     |> filter_items filters
                     |> sort_elements
-                    |> List.map Html.tagged_item_to_html
-                    |> wrap_elements_in_ul
                 in
+                let output_string = match output_format with
+                    | `Html -> Html.tagged_item_list_to_string items
+                    | `Latex -> Latex.tagged_item_list_to_string ~style:latex_style_local items
+                in 
                 Some [Pandoc.RawBlock 
-                ("html", Format.asprintf "%a" (Tyxml.Html.pp_elt ()) items)
+                (output_format_string, 
+                output_string)
                 ]   
         | _ -> None
     in 
@@ -172,18 +187,29 @@ let setup_log style_renderer level =
   Logs.set_reporter (Logs_fmt.reporter ());
   ()
 
+let filetype_of_string = function
+    | Some "html" -> `Html
+    | Some "latex" -> `Latex
+    | None -> `Unspecified
+    | _ -> failwith "filetype should be html or latex"
+
 let cmd = 
     let open Cmdliner in
     let setup_log =
         Term.(const setup_log $ Fmt_cli.style_renderer () $ Logs_cli.level ())
     in
-    let main_term = 
+    let main_term: unit Term.t = 
         let input_arg = Arg.(value & opt string "-" & 
         info ["i"; "input"] ~docv:"FILENAME" ~doc:"the yaml input file") in 
         let output_arg = Arg.(value & opt string "-" & 
         info ["o"; "output"] ~docv:"FILENAME" ~doc:"the output file") in
         let wrap_in_ul = Arg.(value & flag  & 
         info ["ul"]  ~doc:"whether to wrap the resulting divs in ul") in
+        let latex_style = Arg.(value & opt string "normal" &
+        info ["latex-style"] ~docv:"STYLE" ~doc:"the latex style to use") in
+        let filetype = Arg.(value & opt (some string) None &
+        info ["filetype"] ~docv:"FILETYPE" ~doc:"the output filetype") in
+        let filetype: [`Html|`Latex|`Unspecified] Term.t = Term.(const filetype_of_string $ filetype) in
         let filters =
             let only = fun tag -> Only, tag in
             let include_ = fun tag -> Include, tag in
@@ -199,21 +225,41 @@ let cmd =
             let merge_3 = fun a b c -> a @ b @ c in
             Term.(const merge_3 $ only_arg $ include_arg $ exclude_arg)
         in
-        Term.(const catch_failure $ (const main $ wrap_in_ul $ input_arg $ output_arg $ filters) $ setup_log)
+        let main_term: (unit -> unit) Term.t =
+            Term.(const main 
+                $ wrap_in_ul 
+                $ (const Latex.style_of_string $ latex_style) 
+                $ input_arg 
+                $ output_arg 
+                $ filters 
+                $ filetype
+                ) 
+        in
+        Term.(const catch_failure
+            $ main_term
+            $ setup_log)
     in 
-    let main_command = 
+    let main_command: unit Cmd.t = 
         let doc = "serialize a yaml file" in
         let info = Cmd.info "yamlcv" ~doc in
         Cmd.v info main_term
     in
-    let pandoc_command =
+    let pandoc_command: unit Cmd.t =
         let doc = "Run as a pandoc filter to html" in
+        let pandoc_filter = pandoc_filter ~output_format:`Html in
         let term = Term.(const (catch_failure pandoc_filter) $ const ()) in
         let info = Cmd.info "html" ~doc in
         Cmd.v info term
     in
+    let pandoc_latex_command: unit Cmd.t =
+        let doc = "Run as a pandoc filter to latex" in
+        let pandoc_filter = pandoc_filter ~output_format:`Latex in
+        let term = Term.(const (catch_failure pandoc_filter) $ const ()) in
+        let info = Cmd.info "latex" ~doc in
+        Cmd.v info term
+    in
     let info = Cmd.info "yamlcv" ~doc:"CV serialization from yaml files" in
-    Cmd.group ~default:main_term info [main_command; pandoc_command]
+    Cmd.group ~default:main_term info [main_command; pandoc_command; pandoc_latex_command]
 
 
 let () = exit Cmdliner.(Cmd.eval cmd)

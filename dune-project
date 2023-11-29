@@ -1,6 +1,7 @@
 (lang dune 3.7)
 
 (name yamlcv)
+(version 23ff147-dirty)
 
 (generate_opam_files true)
 
