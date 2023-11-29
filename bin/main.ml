@@ -172,8 +172,20 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
                 ]   
         | _ -> None
     in 
+    let eventually_add_header p = match output_format with
+        | `Html -> p
+        | `Latex -> 
+            let previous_header = try Pandoc.meta_string p "header-includes" with _ -> "" in
+            let new_header = 
+                let info_items = all_items |> filter_items [Only, "info"] in
+                Latex.get_latex_info info_items 
+            in 
+            (* CCIO.write_line stderr [%string "new header: %{new_header}"]; *)
+            Pandoc.set_meta "header-includes" (Pandoc.MetaBlocks [Pandoc.RawBlock ("latex", (previous_header ^ new_header))]) p
+    in
     p 
     |> Pandoc.map_blocks block_map (*TODO add inline mapping, for single elem*)
+    |> eventually_add_header
     |> Pandoc.to_json
     |> Yojson.Basic.to_channel stdout
 

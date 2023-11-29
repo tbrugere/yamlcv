@@ -193,3 +193,99 @@ let tagged_item_list_to_string ?(style:[style|`ComputerWrapped of string]=`Norma
     |> List.map latex_to_string
     |> String.concat "\n"
 
+
+type moderncv_info = { firstname: string option;
+    lastname: string option;
+    address: string option;
+    phone: string option;
+    email: string option;
+    social: (string * string * string) list;
+    photo: string option;
+    quote: string option;
+    website: (string*string) option;
+}
+
+let empty_moderncv_info = {
+    firstname=None;
+    lastname=None;
+    address=None;
+    phone=None;
+    email=None;
+    social=[];
+    photo=None;
+    quote=None;
+    website=None;
+}
+
+let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.cvitem) list ) =
+    let info = List.fold_left (
+        let open Base_types in
+        fun info (tags, item) -> match item with
+        | `Item {what; _} when Tags.tagset_contains tags "firstname"  
+            -> {info with firstname=what}
+        | `Item {what; _} when Tags.tagset_contains tags "lastname" 
+            -> {info with lastname=what}
+        | `Item {what=Some what; _} when Tags.tagset_contains tags "name" 
+            -> 
+                let firstname, lastname = 
+                    match String.split_on_char ' ' what with
+                    | [firstname; lastname] -> firstname, lastname
+                    | _ -> what, ""
+                in
+                {info with firstname=Some firstname; lastname=Some lastname}
+        | `Item {what; _} when Tags.tagset_contains tags "address" 
+            -> {info with address=what}
+        | `Item {what; _} when Tags.tagset_contains tags "tel"  
+                                || Tags.tagset_contains tags "phone" 
+            -> {info with phone=what}
+        | `Item {what; _} when Tags.tagset_contains tags "email" 
+            -> {info with email=what}
+        | `Item {what; _} when Tags.tagset_contains tags "photo" 
+            -> {info with photo=what}
+        | `Item {what; _} when Tags.tagset_contains tags "quote" 
+            -> {info with quote=what}
+        | `Link {link; text; alttext; _} 
+            when Tags.tagset_contains tags "social" 
+            -> let link = Option.value link ~default:"" in
+                {info with social=(link, 
+            Option.value text ~default:link, 
+            Option.value ~default:"" alttext)::info.social}
+        | `Link {link; text;  _} when Tags.tagset_contains tags "website" 
+            -> let link = Option.value link ~default:"" in
+                let text = Option.value text ~default:link in
+                {info with website=Some (link, text)}
+        | _ -> info
+    ) empty_moderncv_info items
+    in
+    let latex_list = [] in 
+    let latex_list = match info.firstname with None -> latex_list
+    | Some firstname -> (`Command ("firstname", [`String firstname]))::latex_list
+    in let latex_list = match info.lastname with None -> latex_list
+    | Some lastname -> (`Command ("familyname", [`String lastname]))::latex_list
+    in let latex_list = match info.address with None -> latex_list
+    | Some address -> (`Command ("address", [`String address]))::latex_list
+    in let latex_list = match info.phone with None -> latex_list
+    | Some phone -> (`Command ("phone", [`String phone]))::latex_list
+    in let latex_list = match info.email with None -> latex_list
+    | Some email -> (`Command ("email", [`String email]))::latex_list
+    in
+    let latex_list = match info.photo with
+        | Some photo when include_photo 
+            -> (`Command ("photo", [`String photo]))::latex_list
+        | _ -> latex_list
+    in
+    let latex_list = match info.quote with None -> latex_list
+        | Some quote -> (`Command ("quote", [`String quote]))::latex_list
+    in
+    let latex_list = info.social
+        |> List.map (
+            fun (_, text, alt) -> `CommandOptional ("social", [`String alt], [`String text]))
+        |> List.rev_append latex_list
+    in 
+    let latex_list = match info.website with None -> latex_list
+        | Some (link, text) -> (`Command ("extrainfo", [ `CommandOptional ("weblink", [`String text], [`String link] ) ]
+        )::latex_list)
+    in 
+    `Concat latex_list
+        |> latex_to_string
+

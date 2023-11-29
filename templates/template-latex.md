@@ -1,5 +1,6 @@
 ---
 yamlcv_file: cv.yaml
+documentclass: moderncv
 ---
 
 # Curriculum vitae

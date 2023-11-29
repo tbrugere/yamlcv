@@ -42,5 +42,5 @@ build: [
 ]
 dev-repo: "git+https://github.com/tbrugere/yamlcv.git"
 pin-depends: [
-  [ "pandoc.0.2.0" "git+https://github.com/tbrugere/ocaml-pandoc" ]
+  [ "pandoc.0.2.0" "git+https://github.com/smimram/ocaml-pandoc" ]
 ]

@@ -9,6 +9,9 @@ module TagMap = Map.Make(String)
 type tagset = tag_type TagMap.t
 let empty = TagMap.empty
 
+let tagset_contains tagset tag = 
+    TagMap.mem tag tagset && TagMap.find tag tagset = `Positive
+
 let tagset_to_stringlist tagset = 
     let tagset = TagMap.bindings tagset in
     let tagset = List.map (fun (tag, value) -> 
