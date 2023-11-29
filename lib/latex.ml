@@ -283,7 +283,7 @@ let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.
         |> List.rev_append latex_list
     in 
     let latex_list = match info.website with None -> latex_list
-        | Some (link, text) -> (`Command ("extrainfo", [ `CommandOptional ("hyperref", [`String link; `String text] ) ]
+        | Some (link, text) -> (`Command ("extrainfo", [ `Command ("hyperref", [`String link; `String text] ) ]
         )::latex_list)
     in 
     `Concat latex_list
