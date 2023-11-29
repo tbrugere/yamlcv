@@ -175,12 +175,15 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
         | `Html -> p
         | `Latex -> 
             let previous_header = try Pandoc.meta_string p "header-includes" with _ -> "" in
+            let moderncvstyle = try Pandoc.meta_string p "moderncvstyle" with _ -> "casual" in
+            let moderncvcolor = try Pandoc.meta_string p "moderncvcolor" with _ -> "green" in
+            let moderncvstyle_header = [%string "\\moderncvstyle[%{moderncvcolor}]{%{moderncvstyle}}\n"] in (*TODO: make that into a parameter*)
             let new_header = 
                 let info_items = all_items |> filter_items [Only, "info"] in
                 Latex.get_latex_info info_items 
             in 
             (* CCIO.write_line stderr [%string "new header: %{new_header}"]; *)
-            Pandoc.set_meta "header-includes" (Pandoc.MetaBlocks [Pandoc.RawBlock ("latex", (previous_header ^ new_header))]) p
+            Pandoc.set_meta "header-includes" (Pandoc.MetaBlocks [Pandoc.RawBlock ("latex", (previous_header ^ moderncvstyle_header ^ new_header))]) p
     in
     p 
     |> Pandoc.map_blocks block_map (*TODO add inline mapping, for single elem*)
