@@ -187,7 +187,7 @@ let tagged_item_list_to_string ?(style:[style|`ComputerWrapped of string|`Langua
             (fun x -> [`CVcomputer {category=(`String title); programs=(`String (x |> List.map cvitem_to_latex |> List.map latex_to_string |> String.concat ", "))}]))
     | `LanguageWrapped title ->
             (tagged_item_to_cvitem ~style:`NoCommand, 
-            (fun x -> [`CVlanguage {language=(`String title); level=(`String (x |> List.map cvitem_to_latex |> List.map latex_to_string |> String.concat ", ")); comment=(`String "")}]))
+            (fun x -> [`CVlanguage {language=(`String title); level=(`String (x |> List.map cvitem_to_latex |> List.map latex_to_string |> List.map String.trim |> String.concat ", ")); comment=(`String "")}]))
 
     in
     items
