@@ -221,8 +221,7 @@ let empty_moderncv_info = {
     website=None;
 }
 
-let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.cvitem) list ) =
-    let info = List.fold_left (
+let make_moderncv_info  (items: (Base_types.tags * Base_types.cvitem) list ) =List.fold_left (
         let open Base_types in
         fun info (tags, item) -> match item with
         | `Item {what; _} when Tags.tagset_contains tags "firstname"  
@@ -260,7 +259,31 @@ let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.
                 {info with website=Some (link, text)}
         | _ -> info
     ) empty_moderncv_info items
+
+let add_moderncv_info (add_str: string -> string -> 'a -> 'a) 
+        (add_link: string -> string*string-> 'a -> 'a)
+        (add_social_list: string -> (string*string*string) list -> 'a -> 'a)
+        (a : 'a)
+        : moderncv_info -> 'a = function
+    | {firstname;lastname;address; phone; email; social; photo; quote; website;} ->
+    let maybe (type c) (f: c -> 'b -> 'b) (x: c option) (b: 'b) : 'b = match x with
+        | None -> b
+        | Some x -> f x b
     in
+    a 
+    |> maybe (add_str "moderncv_firstname" ) firstname
+    |> maybe (add_str "moderncv_lastname") lastname
+    |> maybe (add_str "moderncv_address") address
+    |> maybe (add_str "moderncv_phone") phone
+    |> maybe (add_str "moderncv_email") email
+    |> add_social_list "moderncv_social" social
+    |> maybe (add_str "moderncv_photo") photo
+    |> maybe (add_str "moderncv_quote") quote
+    |> (maybe (add_link "moderncv_website")) website
+;;
+
+let get_latex_info ?(include_photo=false) (items: (Base_types.tags * Base_types.cvitem) list ) =
+    let info = make_moderncv_info items in
     let latex_list = [] in 
     let latex_list = match info.firstname with None -> latex_list
     | Some firstname -> (`Command ("firstname", [`String firstname]))::latex_list

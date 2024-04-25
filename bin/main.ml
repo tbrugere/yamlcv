@@ -175,16 +175,46 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
     let eventually_add_header p = match output_format with
         | `Html -> p
         | `Latex -> 
-            let previous_header = try Pandoc.meta_string p "header-includes" with _ -> "" in
-            let moderncvstyle = try Pandoc.meta_string p "moderncvstyle" with _ -> "casual" in
-            let moderncvcolor = try Pandoc.meta_string p "moderncvcolor" with _ -> "green" in
-            let moderncvstyle_header = [%string "\\moderncvstyle[%{moderncvcolor}]{%{moderncvstyle}}\n"] in (*TODO: make that into a parameter*)
-            let new_header = 
+            let moderncv_auto_header = try Pandoc.meta_bool p "moderncv_auto_header" with _ -> false in
+            let use_photo = 
+                try Pandoc.meta_bool p "moderncv_use_photo" with _ -> false in
+            match moderncv_auto_header with
+            | true ->  
+                (*set the info directly in the latex, using header-includes. Problem is this easily gets overriden in config files*)
+                let previous_header = 
+                    try Pandoc.meta_string p "header-includes" with _ -> "" in
+                let moderncvstyle = 
+                    try Pandoc.meta_string p "moderncvstyle" with _ -> "casual" in
+                let moderncvcolor = 
+                    try Pandoc.meta_string p "moderncvcolor" with _ -> "green" in
+                let moderncvstyle_header = 
+                    [%string "\\moderncvstyle[%{moderncvcolor}]{%{moderncvstyle}}\n"] in 
+                let new_header = 
+                    let info_items = all_items |> filter_items [Only, "info"] in
+                    Latex.get_latex_info ~include_photo:use_photo info_items 
+                in 
+                (* CCIO.write_line stderr [%string "new header: %{new_header}"]; *)
+                Pandoc.set_meta "header-includes" (Pandoc.MetaBlocks [Pandoc.RawBlock ("latex", (previous_header ^ moderncvstyle_header ^ new_header))]) p
+            | false -> 
+                (*set the info in metadata variables, and hope the pandoc template uses them*)
+                (*needs custom template, but more stable*)
                 let info_items = all_items |> filter_items [Only, "info"] in
-                Latex.get_latex_info info_items 
-            in 
-            (* CCIO.write_line stderr [%string "new header: %{new_header}"]; *)
-            Pandoc.set_meta "header-includes" (Pandoc.MetaBlocks [Pandoc.RawBlock ("latex", (previous_header ^ moderncvstyle_header ^ new_header))]) p
+                let moderncv_info = Latex.make_moderncv_info info_items in
+                let add_str: string -> string -> Pandoc.t -> Pandoc.t = 
+                    (fun t s  p -> Pandoc.set_meta t (Pandoc.MetaString s) p)
+                and add_link: string -> string*string-> Pandoc.t -> Pandoc.t = 
+                    fun t (text, target) p -> Pandoc.set_meta t 
+                        (Pandoc.MetaMap [("link", Pandoc.MetaString text);
+                                        ("text", Pandoc.MetaString target)])
+                        p
+                and add_social_list: string -> (string*string*string) list -> Pandoc.t -> Pandoc.t = 
+                    (fun t s p -> Pandoc.set_meta t (Pandoc.MetaList 
+                    (List.map (fun (_, text, alt) -> Pandoc.MetaMap [
+                        ("text", Pandoc.MetaString text) ;
+                    ("alt", Pandoc.MetaString alt)
+                    ]) s ))
+                    p)
+                in Latex.add_moderncv_info add_str add_link add_social_list p moderncv_info
     in
     p 
     |> Pandoc.map_blocks block_map (*TODO add inline mapping, for single elem*)
