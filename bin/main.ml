@@ -245,15 +245,15 @@ let cmd =
     in
     let main_term: unit Term.t = 
         let input_arg = Arg.(value & opt string "-" & 
-        info ["i"; "input"] ~docv:"FILENAME" ~doc:"the yaml input file") in 
+        info ["i"; "input"] ~docv:"FILENAME" ~doc:"the yaml input file (default: stdin)") in 
         let output_arg = Arg.(value & opt string "-" & 
-        info ["o"; "output"] ~docv:"FILENAME" ~doc:"the output file") in
+        info ["o"; "output"] ~docv:"FILENAME" ~doc:"the output file (default: stdout)") in
         let wrap_in_ul = Arg.(value & flag  & 
         info ["ul"]  ~doc:"whether to wrap the resulting divs in ul") in
         let latex_style = Arg.(value & opt string "normal" &
         info ["latex-style"] ~docv:"STYLE" ~doc:"the latex style to use") in
         let filetype = Arg.(value & opt (some string) None &
-        info ["filetype"] ~docv:"FILETYPE" ~doc:"the output filetype") in
+        info ["filetype"] ~docv:"FILETYPE" ~doc:"the output filetype (must be html or latex)") in
         let filetype: [`Html|`Latex|`Unspecified] Term.t = Term.(const filetype_of_string $ filetype) in
         let filters =
             let only = fun tag -> Only, tag in
