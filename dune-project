@@ -23,7 +23,7 @@
  (depends ocaml dune yaml containers tyxml tyxml-ppx 
           ppx_deriving ppx_string cmdliner fmt
           yojson
-          (pandoc (= 0.2.0)) 
+          (pandoc (= 0.2.2)) 
           (alcotest :with-test)
           logs
           )

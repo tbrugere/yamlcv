@@ -21,7 +21,7 @@ depends: [
   "cmdliner"
   "fmt"
   "yojson"
-  "pandoc" {= "0.2.0"}
+  "pandoc" {= "0.2.2"}
   "alcotest" {with-test}
   "logs"
   "odoc" {with-doc}
@@ -42,5 +42,5 @@ build: [
 ]
 dev-repo: "git+https://github.com/tbrugere/yamlcv.git"
 pin-depends: [
-  [ "pandoc.0.2.0" "git+https://github.com/tbrugere/ocaml-pandoc" ]
+  [ "pandoc.0.2.2" "git+https://github.com/tbrugere/ocaml-pandoc" ]
 ]

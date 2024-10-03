@@ -142,8 +142,8 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
                     | _ when List.mem "language" classes -> `Language
                     | _ when List.mem "computer" classes -> `Computer
                     | _ when List.mem "nocommand" classes -> `NoCommand
-                    | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc "title" keyvals)
-                    | _ when List.mem "languagewrap" classes -> `LanguageWrapped (List.assoc "title" keyvals)
+                    | _ when List.mem "computerwrap" classes -> `ComputerWrapped (List.assoc_opt "title" keyvals |> Option.value ~default:"")
+                    | _ when List.mem "languagewrap" classes -> `LanguageWrapped (List.assoc_opt "title" keyvals |> Option.value ~default:"")
                     | _ -> latex_style
                 in
                 let filters = 
