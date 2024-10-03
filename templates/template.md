@@ -6,14 +6,14 @@ yamlcv_file: cv.yaml
 
 ## Education
 
-```{.yaml .yamlcv}
+```{.yaml .yamlcv .education}
 en: include
 education: only
 obsolete: exclude
 ```
 ## Experience
 
-```{.yaml .yamlcv}
+```{.yaml .yamlcv .experience}
 en: include
 experience: only
 obsolete: exclude
@@ -21,7 +21,7 @@ obsolete: exclude
 
 ## Languages
 
-```{.yaml .yamlcv}
+```{.yaml .yamlcv .languages}
 langage: only
 en: include
 obsolete: exclude
@@ -29,7 +29,7 @@ obsolete: exclude
 
 ## Computer skills
 
-```{.yaml .yamlcv}
+```{.yaml .yamlcv .cs}
 en: include
 langage_informatique: only
 obsolete: exclude
