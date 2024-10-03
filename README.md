@@ -1,4 +1,4 @@
-# `yamlcv`: overengineered CV tailoring method
+# `yamlcv`: overengineered CV tailoring
 
 Generate tailored CV from data in serialized `yaml` files.
 

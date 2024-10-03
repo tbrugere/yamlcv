@@ -77,16 +77,16 @@ let tagged_item_to_html (tags, cvitem) =
     | `Link link -> link_to_html ~tags:tags_style link
 
 
-let wrap_elements_in_ul elt_list = 
+let wrap_elements_in_ul ?(classes=[]) elt_list = 
     let open Tyxml.Html in
     elt_list
     |> List.map (fun item -> li ~a:[a_class ["yamlcv"]] [item])
-    |> ul ~a:[a_class ["yamlcv"]]
+    |> ul ~a:[a_class ("yamlcv"::classes)]
 
 
 let tagged_item_to = tagged_item_to_html
 
-let tagged_item_list_to_string ?(wrap_in_ul=true) items =
+let tagged_item_list_to_string ?(wrap_in_ul=true) ?(ul_classes=[]) items =
     let items = List.map tagged_item_to_html items in
     match wrap_in_ul with
     | false -> 
@@ -95,6 +95,6 @@ let tagged_item_list_to_string ?(wrap_in_ul=true) items =
             |> String.concat "\n"
     | true -> 
             items
-            |> wrap_elements_in_ul
+            |> wrap_elements_in_ul ~classes:ul_classes
             |> Format.asprintf "%a" (Tyxml.Html.pp_elt ())
 

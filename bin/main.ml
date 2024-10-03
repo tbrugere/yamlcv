@@ -163,7 +163,10 @@ let pandoc_filter ~(output_format:[`Html|`Latex]) () =
                     |> sort_elements
                 in
                 let output_string = match output_format with
-                    | `Html -> Html.tagged_item_list_to_string items
+                    | `Html -> 
+                            let ul_classes: string list = 
+                                List.filter (fun x -> x <> "yamlcv" && x <> "yaml") classes in
+                            Html.tagged_item_list_to_string ~ul_classes items
                     | `Latex -> Latex.tagged_item_list_to_string ~style:latex_style_local items
                 in 
                 Some [Pandoc.RawBlock 
