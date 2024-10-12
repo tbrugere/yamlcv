@@ -53,9 +53,9 @@ let sort_elements ?(sort_year: [`Start|`End] = `End) elements=
     (*define how each type of field is compared*)
     let compare_order_options = function 
         | Some o1, Some o2 -> compare o1 o2 
-        | None, None -> 0
+        | None, None | None, Some 0. | Some 0., None -> 0
         | Some x, None when x < 0.  -> -1
-        | None, Some x when x >= 0. -> -1
+        | None, Some x when x > 0. -> -1
         | _ -> 1
     in
     let compare_dates d1 d2 = 
