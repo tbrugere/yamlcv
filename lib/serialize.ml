@@ -50,6 +50,7 @@ type _ state =
     | ContentState:  context -> [`Text of string] state
     | DateState: context -> [`Date of date_item] state
     | IntState: context -> [`Int of int] state
+    | FloatState: context -> [`Float of float] state
 let string_of_state : type a. a state -> string = fun state ->
     let build_string state_string context = 
         [%string "%{state_string} in context: \n%{context_to_string context}"] in
@@ -58,6 +59,7 @@ let string_of_state : type a. a state -> string = fun state ->
     | ContentState context -> build_string "ContentState" context
     | DateState context -> build_string "DateState" context
     | IntState context -> build_string "IntState" context
+    | FloatState context -> build_string "FloatState" context
 let add_to_state : type a. ?field:string -> ?item_num:int -> ?tag:string -> a state -> a state = 
     fun ?field ?item_num ?tag state -> 
     let add_to_context = add_to_context ?field ?item_num ?tag in
@@ -65,7 +67,8 @@ let add_to_state : type a. ?field:string -> ?item_num:int -> ?tag:string -> a st
     | NoState context -> NoState (add_to_context  context)
     | ContentState context -> ContentState (add_to_context context)
     | DateState context -> DateState (add_to_context context)
-    | IntState context -> IntState (add_to_context  context)
+    | IntState context -> IntState (add_to_context context)
+    | FloatState context -> FloatState (add_to_context context)
 
 let fail ?state error_message yaml = 
     let state_string = match state with 
@@ -243,6 +246,7 @@ let rec parse : type a. a state -> tags -> Yaml.value -> (tags * a) list = fun s
     (* basic parsing *)
     | ContentState _, _, `String s -> [tags, `Text s]
     | IntState _, _, `Float f ->  [tags, `Int (int_of_float f)]
+    | FloatState _, _, `Float f ->  [tags, `Float f]
 
     (*Parsing items*)
     | NoState _, _, `String s ->  [tags, `Item (make_item ~what:s ()) ]
@@ -288,23 +292,33 @@ and parse_item (context:context) (tags: tags) (association_list: (string * Yaml.
     |> List.map (function 
         |( ("what"|"where"|"precision") as field, yaml) 
         -> ((field, (parse (ContentState (add_to_context ~field context)) tags yaml)) 
-            :> string * (tags * [`Text of string | `Date of date_item]) list)
+            :> string * (tags * [`Text of string | `Date of date_item | `Float of float]) list)
         | ("date" as field, yaml) 
-        -> (("date", (parse (DateState (add_to_context ~field context)) tags yaml)
-            :> string * (tags * [`Text of string | `Date of date_item]) list)
+        -> (("date", (parse (DateState (add_to_context ~field context)) tags yaml))
+            :> string * (tags * [`Text of string | `Date of date_item | `Float of float]) list)
+        | ("order" as field, yaml) 
+        -> (("order", (parse (FloatState (add_to_context ~field context)) tags yaml)
+            :> string * (tags * [`Text of string | `Date of date_item| `Float of float]) list)
         )
         | (field, _) -> failwith [%string "Unexpected field in item %{field}"] )
     |> product_merge
+    (*all "impossible" cases are because the parser will already return the right
+        type when given the right key*)
     |> List.map (fun (tags, fields_values)->
-        let detext = function (`Text s) -> s | (`Date _) -> failwith "impossible" 
-        and dedate = function (`Text _) -> failwith "impossible" | (`Date d) -> d 
+        let detext = function (`Text s) -> s 
+                            | (`Date _)| (`Float _) -> failwith "impossible" 
+        and dedate = function (`Text _)| (`Float _) -> failwith "impossible" 
+                            | (`Date d) -> d 
+        and defloat = function (`Text _) | (`Date _) -> failwith "impossible" 
+                            | (`Float o) -> o
         in
         let what = List.assoc_opt "what" fields_values |> Option.map detext
         and where = List.assoc_opt "where" fields_values |> Option.map detext
         and precision = List.assoc_opt "precision" fields_values |> Option.map detext
         and date = List.assoc_opt "date" fields_values |> Option.map dedate
+        and order = List.assoc_opt "order" fields_values |> Option.map defloat
         in
-        tags, `Item (make_item ?what ?where ?precision ?date ())
+        tags, `Item (make_item ?what ?where ?precision ?date ?order ())
     ) 
 and parse_link (context:context) (tags: tags) (association_list: (string * Yaml.value) list ) : (tags * link_cvitem) list =  
     association_list

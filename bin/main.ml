@@ -44,35 +44,52 @@ let filter_items filters = List.filter (fun (tags, _) -> apply_filters filters t
 (*todo maybe several possible sorts in the future? 
 i don't know why i would need anything else though*)
 
-(** Sorts by date first, then by "what field" (empty date goes first), 
+(** Sorts by "order field" first, then by date end or start year, then by "what field" (empty date goes first), 
     then by "where" field
     then just randomly ("precision" field is not an acceptable sorting criterion)
     *)
-let sort_elements elements=
+let sort_elements ?(sort_year: [`Start|`End] = `End) elements=
     let open Yamlcv.Base_types in
-    let compare_dates d1 d2 = 
-        let get_first_year (d: date_item) = match d with
-            | {date = (Year y); _} -> y
-            | {date = (Interval (y, _)); _} -> y
-        in
-        compare (get_first_year d1) (get_first_year d2)
+    (*define how each type of field is compared*)
+    let compare_order_options = function 
+        | Some o1, Some o2 -> compare o1 o2 
+        | None, None -> 0
+        | Some x, None when x < 0.  -> -1
+        | None, Some x when x >= 0. -> -1
+        | _ -> 1
     in
+    let compare_dates d1 d2 = 
+        let get_year (d: date_item) = match d, sort_year with
+            | {date = (Year y); _}, _ -> `Year y
+            | {date = (Interval (y, _)); _}, `Start -> `Year y
+            | {date = (Interval (_, Some y)); _}, `End -> `Year y
+            | {date = (Interval (_, None)); _}, `End -> `Present
+        in 
+        let year1 = get_year d1 and year2 = get_year d2 in
+        match year1, year2 with
+        | `Present, `Present -> 0
+        | `Present, _ -> 1
+        | _, `Present -> -1
+        | `Year y1, `Year y2 -> compare y1 y2
+    in
+    (*generic comparison of options: if one of the elements is None, then the other is bigger*)
     let compare_options compare = function
         | None, None -> 0
         | None, Some _ -> -1
         | Some _, None -> 1
         | Some x, Some y -> compare x y
     in
-    let compare_elements e1 e2 = 
-        match compare_options compare_dates (e1.date, e2.date) with
-        | 0 -> begin match compare_options String.compare (e1.what, e2.what) with 
-            | 0 -> begin match compare_options String.compare (e1.where, e2.where) with
-                | 0 -> Random.int 2 - 1
-                | x -> x
-            end
-            | x -> x
-        end
+    (*precendence of comparison*)
+    let (|?) a f = match a with
+        | 0 -> f ()
         | x -> x
+    in
+    let compare_elements e1 e2 =
+        compare_order_options (e1.order, e2.order)
+        |? fun () -> compare_options compare_dates (e1.date, e2.date)
+        |? fun () -> compare_options String.compare (e1.what, e2.what)
+        |? fun () -> compare_options String.compare (e1.where, e2.where)
+        |? fun () -> (Random.int 2) * 2 - 1
     in
     let compare_item_or_link i1 i2 = match i1, i2 with
         | `Item i1, `Item i2 -> compare_elements i1 i2

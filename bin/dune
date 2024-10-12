@@ -1,5 +1,6 @@
 (executable
  (public_name yamlcv)
  (name main)
+ (modes byte exe)
  (preprocess (pps tyxml-ppx ppx_string))
  (libraries yamlcv containers yaml cmdliner tyxml logs fmt fmt.cli fmt.tty logs.fmt logs.cli))

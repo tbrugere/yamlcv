@@ -17,6 +17,7 @@ type item = {
     what: string option;
     where: string option;
     precision: string option;
+    order: float option;
 } [@@deriving make, show]
 
 type item_cvitem = [`Item of item][@@deriving show]
